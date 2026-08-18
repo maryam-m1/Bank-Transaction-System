@@ -159,4 +159,88 @@ async function createTransaction(req, res) {
     }
 }
 
-module.exports = { createTransaction }
+
+
+/**
+ * -Create initial Funds transaction from System user
+ * used by the system/admin to inject the very first starting balance into a newly created bank account 
+ * (since a new account starts with zero balance and has no sender account).
+ * - HANDLED BY SYSTEM/ADMIN >  SO NO NEED OF [FROM ACCOUNT] , ONLY NEED [TO ACCOUNT] OF (NEWLY CREATED USER)
+ */
+async function createInitialFunds(req,res){
+const {toAccount,amount,idemPotencyKey}=req.body
+// check whether all parameters came with request 
+        if (!toAccount || !amount || !idempotencyKey) {
+            return res.status(400).json({
+                message: "toAccount, amount and idempotencyKey are Required!"
+            })
+        }
+ // now check do both given accounts exists in dataBase
+//TO ACCOUNT
+  const toUserAccount = await accountModel.findOne({
+            _id: toAccount
+        })
+
+          if (!toUserAccount) {
+            return res.status(400).json({
+                message: "Valid toAccount and fromAccounts are Required!"
+            }) 
+        }
+// FROM ACCOUNT
+        const fromUserAccount = await accountModel.findOne({
+            systemUser:true,
+            user: fromAccount
+        })
+        if (!fromUserAccount) {
+            return res.status(400).json({
+                message: "System user Account not Found!"
+            }) 
+        }
+
+      
+
+        /**
+         * - validate idemPotencyKey >> if transaction with this idempotency already done or not
+         */
+        const transactionAlreadyDone = await transcationModel.findOne({
+            idemPotencyKey: idempotencyKey
+        })
+
+        if (transactionAlreadyDone) {
+            if (transactionAlreadyDone.status == "Completed") {
+                return res.status(200).json({
+                    message: "Transaction is already Done!",
+                    transactionAlreadyDone
+                });
+            }
+
+            if (transactionAlreadyDone.status == "Pending") {
+                return res.status(202).json({
+                    message: "Transaction is still in process!",
+                    transactionAlreadyDone
+                });
+            }
+
+            if (transactionAlreadyDone.status == "Reversed") {
+                return res.status(500).json({
+                    message: "Transaction was Reversed!",
+                    transactionAlreadyDone
+                });
+            }
+
+            if (transactionAlreadyDone.status == "Failed") {
+                return res.status(500).json({
+                    message: "Transaction is Failed! Please Try Again!",
+                    transactionAlreadyDone
+                });
+            }
+        }
+
+
+
+}
+
+
+
+
+module.exports = { createTransaction,createInitialFunds }
