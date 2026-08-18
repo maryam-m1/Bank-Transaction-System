@@ -9,7 +9,7 @@ const accountSchema = new mongoose.Schema({
         index: true
     },
     status: {
-        type: String, // <--- Type yahan dena lazmi hai
+        type: String, 
         enum: {
             values: ["Active", "Frozen", "Closed"],
             message: "Account status can be either Active, Frozen or Closed."
@@ -28,7 +28,7 @@ accountSchema.index({ userID: 1, status: 1 });
 /***
  * - Aggregate PipeLine
  */
-accountModel.methods.getBalance = async function() {
+accountSchema.methods.getBalance = async function() {
     const balanceData = await ledgerModel.aggregate([
         { $match: { account: this._id } },
         {
@@ -62,14 +62,14 @@ accountModel.methods.getBalance = async function() {
         }
     ]);
 
- //if first tansaction from account and no ledger entry is made yet
-    if(balanceData.lenght==0){
-        return 0
+    // if first transaction from account and no ledger entry is made yet
+    if (!balanceData || balanceData.length === 0) {
+        return 0;
     }
 
-    return balanceData[0].balance
+    return balanceData[0].balance;
 };
 
-const accountModel = mongoose.model("accountModel", accountSchema);
+const accountModel = mongoose.model("account", accountSchema);
 
 module.exports = accountModel;
