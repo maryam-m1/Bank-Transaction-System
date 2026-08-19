@@ -167,80 +167,87 @@ async function createTransaction(req, res) {
  * (since a new account starts with zero balance and has no sender account).
  * - HANDLED BY SYSTEM/ADMIN >  SO NO NEED OF [FROM ACCOUNT] , ONLY NEED [TO ACCOUNT] OF (NEWLY CREATED USER)
  */
-async function createInitialFunds(req,res){
-const {toAccount,amount,idemPotencyKey}=req.body
-// check whether all parameters came with request 
+async function createInitialFunds(req, res) {
+    try {
+        const { toAccount, amount, idempotencyKey } = req.body
+        
+        // check whether all parameters came with request 
         if (!toAccount || !amount || !idempotencyKey) {
             return res.status(400).json({
                 message: "toAccount, amount and idempotencyKey are Required!"
             })
         }
- // now check do both given accounts exists in dataBase
-//TO ACCOUNT
-  const toUserAccount = await accountModel.findOne({
+        
+        // TO ACCOUNT
+        const toUserAccount = await accountModel.findOne({
             _id: toAccount
         })
 
-          if (!toUserAccount) {
+        if (!toUserAccount) {
             return res.status(400).json({
-                message: "Valid toAccount and fromAccounts are Required!"
+                message: "Valid toAccount is Required!"
             }) 
         }
-// FROM ACCOUNT
+
+        // FROM ACCOUNT (System User - checking req.body.fromAccount or finding system user)
         const fromUserAccount = await accountModel.findOne({
-            systemUser:true,
-            user: fromAccount
+            systemUser: true,
+            user: req.body.fromAccount || toUserAccount.user
         })
+        
         if (!fromUserAccount) {
             return res.status(400).json({
                 message: "System user Account not Found!"
             }) 
         }
 
-      
+        const session = await mongoose.startSession()
+        session.startTransaction()
 
-        /**
-         * - validate idemPotencyKey >> if transaction with this idempotency already done or not
-         */
-        const transactionAlreadyDone = await transcationModel.findOne({
-            idemPotencyKey: idempotencyKey
+        const transaction = await transcationModel.create([{
+            fromAccount: fromUserAccount._id,
+            toAccount,
+            amount,
+            idemPotencyKey: idempotencyKey,
+            status: "Pending"
+        }], { session })
+
+        const createdTransaction = transaction[0];
+
+        await ledgerModel.create([{
+            account: fromUserAccount._id,
+            amount: amount,
+            transcation: createdTransaction._id,
+            type: "Debit"
+        }], { session })
+
+        await ledgerModel.create([{
+            account: toUserAccount._id,
+            amount: amount,
+            transcation: createdTransaction._id,
+            type: "Credit"
+        }], { session })
+
+        createdTransaction.status = "Completed"
+        await createdTransaction.save({ session })
+        await session.commitTransaction()
+        session.endSession()
+
+        return res.status(201).json({
+            message: "Initial Fund Transaction Completed successfully!",
+            transaction: createdTransaction
         })
-
-        if (transactionAlreadyDone) {
-            if (transactionAlreadyDone.status == "Completed") {
-                return res.status(200).json({
-                    message: "Transaction is already Done!",
-                    transactionAlreadyDone
-                });
-            }
-
-            if (transactionAlreadyDone.status == "Pending") {
-                return res.status(202).json({
-                    message: "Transaction is still in process!",
-                    transactionAlreadyDone
-                });
-            }
-
-            if (transactionAlreadyDone.status == "Reversed") {
-                return res.status(500).json({
-                    message: "Transaction was Reversed!",
-                    transactionAlreadyDone
-                });
-            }
-
-            if (transactionAlreadyDone.status == "Failed") {
-                return res.status(500).json({
-                    message: "Transaction is Failed! Please Try Again!",
-                    transactionAlreadyDone
-                });
-            }
-        }
-
-
-
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
 }
 
 
 
 
-module.exports = { createTransaction,createInitialFunds }
+
+module.exports = { createTransaction, createInitialFunds }
