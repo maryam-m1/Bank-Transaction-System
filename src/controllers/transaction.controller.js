@@ -104,6 +104,8 @@ async function createTransaction(req, res) {
             })
         }
 
+
+        try{
         /**
          * 5-Create Transaction (Pending)
          */
@@ -139,6 +141,12 @@ async function createTransaction(req, res) {
         await createdTransaction.save({ session })
         await session.commitTransaction()
         session.endSession()
+    }
+    catch(error){
+        return res.status(400).json({
+            message:"Transaction Failed due to an Error! Try Again."
+        })
+    }
 
         /**
          * 10-Send email notification
@@ -169,7 +177,7 @@ async function createTransaction(req, res) {
  */
 async function createInitialFunds(req, res) {
     try {
-        const { toAccount, amount, idempotencyKey } = req.body
+        const { fromAccount, toAccount, amount, idempotencyKey } = req.body
         
         // check whether all parameters came with request 
         if (!toAccount || !amount || !idempotencyKey) {
@@ -189,11 +197,13 @@ async function createInitialFunds(req, res) {
             }) 
         }
 
-        // FROM ACCOUNT (System User - checking req.body.fromAccount or finding system user)
-        const fromUserAccount = await accountModel.findOne({
-            systemUser: true,
-            user: req.body.fromAccount || toUserAccount.user
-        })
+        // FROM ACCOUNT (System User - handling both explicit fromAccount or finding via logged-in user)
+        let fromUserAccount;
+        if (fromAccount) {
+            fromUserAccount = await accountModel.findOne({ _id: fromAccount });
+        } else {
+            fromUserAccount = await accountModel.findOne({ userID: req.user._id });
+        }
         
         if (!fromUserAccount) {
             return res.status(400).json({
@@ -245,9 +255,5 @@ async function createInitialFunds(req, res) {
         });
     }
 }
-
-
-
-
 
 module.exports = { createTransaction, createInitialFunds }
