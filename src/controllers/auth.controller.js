@@ -2,6 +2,7 @@ const userModel = require("../models/user.model")
 const jwt = require("jsonwebtoken")
 const bcryptjs=require("bcryptjs")
 const emailService=require("../services/email.service")
+const tokenBlacListModel = require("../models/blacklist.model")
 
 /**
  * - user registration controller 
@@ -102,4 +103,29 @@ const token = jwt.sign(
     }
 }
 
-module.exports = { userRegistrationController, userLoginController }
+/**
+ * - Logout API
+ * - /api/auth/logout
+ */
+
+async function userLogoutController(req,res){
+//we must need token > if token not then what will we blackList
+const token= req.cookies.token || req.headers.authorization?.split(" ")[1]
+if(!token){
+    return res.status(400).json({
+        message:"Logged Out!"
+    })
+}
+
+//clear token > empty
+ res.cookie("token","")
+
+ await tokenBlackListModel.create({
+    token:token
+ })
+return res.status(200).json({
+    message:"Logged Out!"
+})
+}
+ 
+module.exports = { userRegistrationController, userLoginController,userLogoutController }
