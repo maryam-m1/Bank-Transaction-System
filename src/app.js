@@ -12,6 +12,14 @@ app.use(express.json())
 app.use(cookieParser())
 
 // Use Routes
+
+//test >>>
+app.get("/",(req,res)=>{
+ res.send("Banking Service is Running!")
+})
+
+
+//Rest of functional APIs
 app.use("/api/auth", authRouter) 
 app.use("/api/accounts", accountRouter)
 app.use("/api/transactions", transactionRouter)
