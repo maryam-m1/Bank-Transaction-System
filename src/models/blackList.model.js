@@ -13,7 +13,7 @@ const tokenBlackListSchema = new mongoose.Schema({
     }
 });
 
-// Yahan check lagana zaroori hai taake model dobara overwrite na ho
+// Check if the model already exists to prevent OverwriteModelError during hot reloads
 const tokenBlackListModel = mongoose.models.TokenBlackList || mongoose.model('TokenBlackList', tokenBlackListSchema);
 
 module.exports = tokenBlackListModel;

@@ -117,12 +117,15 @@ if(!token){
     })
 }
 
-//clear token > empty
- res.cookie("token","")
 
+//set cookies >token in blacklist modl then clear 
  await tokenBlackListModel.create({
     token:token
  })
+ //now clear 
+ res.clearCookie("token")
+
+ 
 return res.status(200).json({
     message:"Logged Out!"
 })
